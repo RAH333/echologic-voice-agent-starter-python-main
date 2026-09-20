@@ -166,7 +166,31 @@ async function listMics() {
   })
   if (chosen && inputs.some((device) => device.deviceId === chosen)) select.value = chosen
 }
-listMics()
+
+window.addEventListener("DOMContentLoaded", () => {
+  listMics();
+  fetch('/agent')
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.name) {
+        AGENT.name = data.name;
+        
+        // Find and replace the template text placeholders
+        const textNodes = document.createNodeIterator(document.body, NodeFilter.SHOW_TEXT);
+        let current;
+        while (current = textNodes.nextNode()) {
+          if (current.nodeValue.includes('{{AGENT_NAME}}')) {
+            current.nodeValue = current.nodeValue.replace('{{AGENT_NAME}}', data.name);
+          }
+        }
+        
+        const titleEl = document.querySelector('header h1') || document.querySelector('.title') || document.getElementById('agent_name_placeholder');
+        if (titleEl) titleEl.textContent = data.name;
+      }
+    })
+    .catch((err) => console.log("Metadata loading skipped:", err));
+});
+
 navigator.mediaDevices?.addEventListener?.('devicechange', listMics)
 
 $('btn').onclick = () => (ws?.readyState <= 1 ? stop() : start())
@@ -413,7 +437,7 @@ const partialEl = {}
 let liveReply = null
 let printedReply = null
 
-const ATTACHES_LEFT = /^[.,!?;:%Â°)\]}â€¦'" Tillyâ€™]/
+const ATTACHES_LEFT = /^[.,!?;:%Â°)/\]}â€¦'"â€™â€]/
 const NO_SPACE_AFTER = /[([{$\-\/'"â€˜â€œ]$/
 
 function appendDelta(text, delta) {
@@ -535,4 +559,4 @@ function logEvent(direction, type, detail) {
   while (log.children.length > 400) log.firstChild.remove()
   if (COALESCE.has(type)) open.set(key, { row, count: 1, detail, painted: 0 })
   if (atBottom) scroll(log)
-      }
+    }
