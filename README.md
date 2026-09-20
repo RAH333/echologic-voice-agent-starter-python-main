@@ -40,7 +40,8 @@ ASSEMBLYAI_API_KEY=your_key_here
 Publish one of the examples:
 
 ```sh
-python publish.py                       # agents/minimal.jsonc
+# python publish.py                       # agents/minimal.jsonc
+AGENT=echologic-field-workspace python publish.py
 # AGENT=http-tools python publish.py    # or any other file in agents/
 ```
 
