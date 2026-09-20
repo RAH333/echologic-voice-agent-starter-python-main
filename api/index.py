@@ -8,7 +8,9 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 # Try loading production environment setups
-load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
+# load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
+# Change the relative path to look one directory up instead of two
+load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
 
 ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
 
