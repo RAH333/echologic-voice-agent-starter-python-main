@@ -1,0 +1,83 @@
+{
+  "version": "1.0",
+  "name": "EchoLogic AI Field Workspace Agent",
+  "prompt": {
+    "system": "You are EchoLogic AI, a highly efficient, professional, and reliable autonomous real-time voice workspace assistant for field engineers, logistics coordinators, and industrial maintenance personnel. Your primary purpose is to help workers execute critical hands-free workflows safely in high-risk environments. You process incoming technical reports and convert verbal data into structured enterprise updates.\n\nCRITICAL CONSTRAINTS:\n1. Keep responses concise, direct, and conversational. The user is actively working with their hands; do not give long-winded answers.\n2. When a user reports a system status or a critical incident, proactively trigger the appropriate tool immediately.\n3. If essential details for a tool are missing (e.g., specific telemetry metrics or exact hazard level), ask clear, targeted follow-up questions to gather them.\n4. Maintain a calm, safety-focused demeanor at all times."
+  },
+  "settings": {
+    "turn_taking": {
+      "mode": "heurstics", 
+      "heuristics": {
+        "silence_threshold_ms": 600
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "log_hazardous_incident",
+      "description": "Logs an operational hazard, safety issue, or equipment failure into the enterprise database immediately.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "severity": {
+            "type": "string",
+            "enum": ["LOW", "MEDIUM", "HIGH", "CRITICAL"],
+            "description": "The classified urgency level of the threat or incident."
+          },
+          "system_component": {
+            "type": "string",
+            "description": "The specific machinery, subsystem, or infrastructure pipeline element affected (e.g., 'HVAC Compressor B', 'Main Pressure Valve')."
+          },
+          "description": "A comprehensive summary of the visual details, sounds, or errors reported by the engineer.",
+          "requires_dispatch": {
+            "type": "boolean",
+            "description": "Set to true if emergency support, medical staff, or backup technical teams are immediately needed on site."
+          }
+        },
+        "required": ["severity", "system_component", "description", "requires_dispatch"]
+      }
+    },
+    {
+      "name": "update_dispatch_status",
+      "description": "Updates the real-time operational workflow status of a field dispatch ticket.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "ticket_id": {
+            "type": "string",
+            "description": "The alphanumeric identifier of the active work order or ticket."
+          },
+          "status": {
+            "type": "string",
+            "enum": ["EN_ROUTE", "ON_SITE", "IN_PROGRESS", "BLOCKED", "COMPLETED"],
+            "description": "The updated step of the engineer's workspace operational flow."
+          },
+          "notes": {
+            "type": "string",
+            "description": "Any brief situational field notes provided verbally regarding parts used, system metrics, or delays."
+          }
+        },
+        "required": ["ticket_id", "status"]
+      }
+    },
+    {
+      "name": "query_system_telemetry",
+      "description": "Fetches current live database telemetry data for a specific asset to help the field engineer verify active states hands-free.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "asset_id": {
+            "type": "string",
+            "description": "The ID of the machine, server, or structural node the user wants to audit."
+          },
+          "metric_type": {
+            "type": "string",
+            "enum": ["TEMPERATURE", "PRESSURE", "VOLTAGE", "ALL"],
+            "description": "The specific metric class requested by the user."
+          }
+        },
+        "required": ["asset_id"]
+      }
+    }
+  ]
+}
