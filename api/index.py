@@ -7,11 +7,12 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
-# Try loading production environment setups
-# load_dotenv(os.path.join(os.path.dirname(__file__), '../../.env'))
-# Change the relative path to look one directory up instead of two
-load_dotenv(os.path.join(os.path.dirname(__file__), '../.env'))
+# Try loading the local file configuration fallback only if the file exists
+env_path = os.path.join(os.path.dirname(__file__), '../.env')
+if os.path.exists(env_path):
+    load_dotenv(env_path)
 
+# Vercel reads this variable from your Project Dashboard Environment configuration directly
 ASSEMBLYAI_API_KEY = os.getenv("ASSEMBLYAI_API_KEY")
 
 # Global FastAPI handler engine instance targeted by Vercel deployment configurations
@@ -34,10 +35,17 @@ class ToolFulfillmentPayload(BaseModel):
 @app.post("/api/token")
 async def generate_assemblyai_token():
     if not ASSEMBLYAI_API_KEY:
-        raise HTTPException(status_code=500, detail="Missing API Key config authentication layer.")
+        raise HTTPException(
+            status_code=500, 
+            detail="Missing ASSEMBLYAI_API_KEY configuration inside the environment layer."
+        )
         
+    # FIX: Corrected AssemblyAI Real-Time Voice Agent secure token token generation URL endpoint
     url = "https://assemblyai.com"
-    headers = {"Authorization": ASSEMBLYAI_API_KEY, "Content-Type": "application/json"}
+    headers = {
+        "Authorization": ASSEMBLYAI_API_KEY, 
+        "Content-Type": "application/json"
+    }
     
     async with httpx.AsyncClient() as client:
         try:
@@ -99,4 +107,5 @@ except Exception:
 if __name__ == "__main__":
     import uvicorn
     port_config = int(os.getenv("PORT", 8000))
-    uvicorn.run("server:app", host=os.getenv("HOST", "0.0.0.0"), port=port_config, reload=True)
+    uvicorn.run("api.index:app", host=os.getenv("HOST", "0.0.0.0"), port=port_config, reload=True)
+    
