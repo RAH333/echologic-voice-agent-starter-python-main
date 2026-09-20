@@ -39,6 +39,18 @@ class ToolFulfillmentPayload(BaseModel):
     tool: str
     arguments: dict
 
+@app.get("/api/agent")
+async def get_agent_details():
+    """
+    Explicit metadata helper route providing the active dashboard settings 
+    to prevent template variable placeholder parsing errors.
+    """
+    return {
+        "id": AGENT_ID or "unknown_agent",
+        "name": "EchoLogic AI Field Workspace Agent",
+        "description": "Autonomous voice workspace helper context for technical field dispatches."
+    }
+
 @app.post("/api/token")
 async def generate_assemblyai_token():
     if not ASSEMBLYAI_API_KEY:
@@ -64,7 +76,6 @@ async def generate_assemblyai_token():
             if response.status_code != 200:
                 raise HTTPException(status_code=response.status_code, detail=response.text)
             
-            # Combine the security token and the agent identifier to pass to the front end
             token_data = response.json()
             token_data["agent_id"] = AGENT_ID
             return token_data
@@ -85,6 +96,43 @@ async def handle_agent_tools(payload: ToolFulfillmentPayload):
             
             return JSONResponse(content={
                 "output": f"Incident successfully registered into system logs. System flag logged for {component} at {severity} priority level. Dispatch active evaluated to {requires_dispatch}."
+            })
+            
+        elif tool_name == "update_dispatch_status":
+            ticket_id = args.get("ticket_id")
+            status_update = args.get("status")
+            return JSONResponse(content={
+                "output": f"Work order tracking status token {ticket_id} updated to operational status level {status_update}."
+            })
+            
+        elif tool_name == "query_system_telemetry":
+            asset_id = args.get("asset_id")
+            metric_type = args.get("metric_type", "ALL")
+            
+            mock_telemetry = {"TEMPERATURE": "74.2°C", "PRESSURE": "142 PSI", "VOLTAGE": "230V"}
+            speech = f"Telemetry stream scan completed for asset node {asset_id}. "
+            if metric_type == "ALL":
+                speech += f"Temperature is {mock_telemetry['TEMPERATURE']}, pressure is {mock_telemetry['PRESSURE']}, and electrical load is {mock_telemetry['VOLTAGE']}."
+            else:
+                speech += f"Requested metric {metric_type} is {mock_telemetry.get(metric_type, 'UNKNOWN')}."
+                
+            return JSONResponse(content={"output": speech})
+            
+        return JSONResponse(status_code=422, content={"output": "Workspace tool path matches no current active system routing rules."})
+            
+    except Exception as error:
+        return JSONResponse(status_code=500, content={"output": f"Fulfillment subsystem critical operational error: {str(error)}"})
+
+try:
+    static_path = os.path.join(os.path.dirname(__file__), ".")
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
+except Exception:
+    pass
+
+if __name__ == "__main__":
+    import uvicorn
+    port_config = int(os.getenv("PORT", 8000))
+    uvicorn.run("api.index:app", host=os.getenv("HOST", "0.0.0.0"), port=port_config, reload=True)
             })
             
         elif tool_name == "update_dispatch_status":
