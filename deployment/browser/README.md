@@ -5,7 +5,8 @@ Serves a page with a call button. Useful for iterating on an agent before puttin
 ## 1. Publish an agent
 
 ```sh
-AGENT=http-tools python publish.py
+# AGENT=http-tools python publish.py
+AGENT=echologic-field-workspace python publish.py
 ```
 
 ## 2. Run it
