@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "deployment/browser/serverss.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "deployment/browser/serverss.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "deployment/browser/$1"
+    }
+  ]
+}
