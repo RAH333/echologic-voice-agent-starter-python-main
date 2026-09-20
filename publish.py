@@ -19,7 +19,8 @@ def main() -> None:
     load_env()
     required("ASSEMBLYAI_API_KEY", "get one at https://www.assemblyai.com/dashboard/api-keys")
 
-    name = os.environ.get("AGENT", "minimal")
+    #name = os.environ.get("AGENT", "minimal")
+    name = os.environ.get("AGENT", "echologic-field-workspace")
     agent = read_agent(name)
     result = publish_agent(agent, name=name)
 
