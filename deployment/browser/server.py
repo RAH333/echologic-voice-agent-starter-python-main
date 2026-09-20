@@ -23,7 +23,7 @@ from lib import (ApiError, aai, load_env, publish_agent, read_agent,  # noqa: E4
 def resolve_agent() -> dict:
     """A published id means the agent is managed elsewhere, so use it as it is."""
     # name = os.environ.get("AGENT", "minimal")
-    name = os.environ.get("AGENT", "agents/echologic-field-workspace")
+    name = os.environ.get("AGENT", "echologic-field-workspace")
     known = stored_agent_id(name)
     if known:
         try:
