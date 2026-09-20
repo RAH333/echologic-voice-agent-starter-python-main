@@ -6,14 +6,14 @@
       "use": "@vercel/python"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "/deployment/browser/serverss.py"
+      "src": "/api/(.*)",
+      "dest": "deployment/browser/serverss.py"
     },
     {
-      "source": "/(.*)",
-      "destination": "/deployment/browser/$1"
+      "src": "/(.*)",
+      "dest": "deployment/browser/$1"
     }
   ]
 }
