@@ -4,7 +4,7 @@ const $ = (id) => document.getElementById(id)
 // The rate the API speaks. Both worklets resample, since a browser may
 // ignore the rate an AudioContext asks for.
 const WIRE_RATE = 24_000
-const AGENT = window.AGENT
+let AGENT = { id: "", name: "EchoLogic AI Field Workspace Agent" }
 
 // Scratch buffers are reused: allocating on the audio thread causes glitches.
 const CAPTURE_WORKLET = `
@@ -145,14 +145,11 @@ const blobUrl = (code) =>
 let ws, captureCtx, playbackCtx, playback, mic, callStart, timer
 
 // --- microphones ---
-// Labels stay empty until mic permission is granted, so this runs again after
-// getUserMedia.
 async function listMics() {
   if (!navigator.mediaDevices?.enumerateDevices) return
   const devices = await navigator.mediaDevices.enumerateDevices()
   const inputs = devices
     .filter((device) => device.kind === 'audioinput')
-    // Chrome's synthetic entries alias a real device and duplicate it.
     .filter((device) => device.deviceId !== 'default' && device.deviceId !== 'communications')
   const select = $('mic')
   const chosen = select.value
@@ -188,18 +185,9 @@ function showTab(name) {
   }
   if (name === 'agent' && !agentLoaded) {
     agentLoaded = true
-    fetch('/agent')
-      .then((res) => res.json())
-      .then((agent) => {
-        $('agent-body').replaceChildren()
-        const pre = document.createElement('pre')
-        pre.textContent = JSON.stringify(agent, null, 2)
-        $('agent-body').append(pre)
-      })
-      .catch(() => {
-        agentLoaded = false
-        $('agent-body').textContent = 'Could not load the agent.'
-      })
+    const targetPre = document.createElement('pre')
+    targetPre.textContent = JSON.stringify({ "agent_id": AGENT.id, "name": AGENT.name }, null, 2)
+    $('agent-body').replaceChildren(targetPre)
   }
 }
 $('tab-events').onclick = () => showTab('events')
@@ -221,16 +209,22 @@ async function start() {
   setStatus('connecting')
 
   try {
-    // The API key never reaches the page; this token expires in 60 seconds.
-    const res = await fetch('/token')
+    const res = await fetch('/api/token', { method: 'POST' })
     if (!res.ok) {
       setStatus('error', 'could not mint a token, check the API key')
       reset()
       return
     }
-    const { token } = await res.json()
+    
+    const data = await res.json()
+    const token = data.token
+    
+    if (data.agent_id) {
+        AGENT.id = data.agent_id
+        const titleEl = document.querySelector('header h1') || document.querySelector('.title')
+        if (titleEl) titleEl.textContent = AGENT.name
+    }
 
-    // Two contexts, created in the click handler so Safari starts them.
     captureCtx = new AudioContext({ sampleRate: WIRE_RATE })
     playbackCtx = new AudioContext({ sampleRate: WIRE_RATE })
     await Promise.all([captureCtx.resume(), playbackCtx.resume()])
@@ -241,7 +235,6 @@ async function start() {
     const deviceId = $('mic').value
     mic = await navigator.mediaDevices.getUserMedia({
       audio: {
-        // A preference, not `exact`: an unplugged device falls back.
         ...(deviceId ? { deviceId } : {}),
         channelCount: 1,
         echoCancellation: true,
@@ -258,7 +251,6 @@ async function start() {
     ws = new WebSocket(url)
     let ready = false
 
-    // The API takes base64 inside JSON, not binary frames.
     capture.port.onmessage = ({ data }) => {
       if (!ready || ws.readyState !== 1) return
       const bytes = new Uint8Array(data)
@@ -270,7 +262,6 @@ async function start() {
       logEvent('up', 'input.audio')
     }
 
-    // Everything about the agent lives server-side; the session just names it.
     ws.onopen = () => {
       ws.send(JSON.stringify({ type: 'session.update', session: { agent_id: AGENT.id } }))
       logEvent('up', 'session.update', AGENT.id)
@@ -292,7 +283,6 @@ async function start() {
           break
 
         case 'input.speech.started':
-          // Barge-in: empty the ring buffer so the agent stops mid-word.
           playback?.port.postMessage('stop')
           setStatus('listening')
           logEvent('down', msg.type)
@@ -318,13 +308,11 @@ async function start() {
           logEvent('down', msg.type, msg.status)
           break
 
-        // text is the full transcript so far, so it replaces.
         case 'transcript.user.delta':
           partial('you', msg.text)
           logEvent('down', msg.type, msg.text)
           break
 
-        // delta is the next word only, so it appends.
         case 'transcript.agent.delta':
           logEvent('down', msg.type, msg.delta)
           if (msg.reply_id && msg.reply_id === printedReply) break
@@ -347,7 +335,6 @@ async function start() {
           break
 
         case 'tool.call': {
-          // http tools run on AssemblyAI's side; no result comes back here.
           const args = JSON.stringify(msg.arguments ?? {})
           addLine('tool', `${msg.name}(${args})`)
           logEvent('down', msg.type, `${msg.name} ${args}`)
@@ -378,7 +365,6 @@ async function start() {
 }
 
 function stop() {
-  // Close cleanly so the session record ends, falling back to the socket.
   if (ws?.readyState === 1) {
     ws.send(JSON.stringify({ type: 'session.end' }))
     logEvent('up', 'session.end')
@@ -412,8 +398,6 @@ function setStatus(state, detail) {
   $('status-text').textContent = detail || state
 }
 
-// $4.50 an hour, the list price at assemblyai.com/pricing. Billing is per
-// session minute, so the running figure is an estimate, not an invoice.
 const COST_PER_SECOND = 4.5 / 3600
 
 function tick() {
@@ -426,16 +410,11 @@ function tick() {
 // --- transcript ---
 const partialText = {}
 const partialEl = {}
-// The full reply arrives once its audio has been sent, which beats the audio
-// playing out, so deltas keep coming after the line is printed. printedReply
-// stops them rebuilding the same sentence underneath it.
 let liveReply = null
 let printedReply = null
 
-// Deltas arrive with a leading space sometimes and without it other times, so
-// add one only when neither side has one and the delta is not punctuation.
-const ATTACHES_LEFT = /^[.,!?;:%°)\]}…'"’”]/
-const NO_SPACE_AFTER = /[([{$\-\/'"‘“]$/
+const ATTACHES_LEFT = /^[.,!?;:%Â°)\]}â€¦'" Tillyâ€™]/
+const NO_SPACE_AFTER = /[([{$\-\/'"â€˜â€œ]$/
 
 function appendDelta(text, delta) {
   if (!delta) return text
@@ -498,8 +477,6 @@ function clearPartials() {
 }
 
 // --- event log ---
-// Audio frames arrive ~190 times a second each way, so these types hold a row
-// open and count into it. Both streams run at once, hence a row per key.
 const COALESCE = new Set([
   'input.audio',
   'reply.audio',
@@ -516,7 +493,7 @@ function eventRow(direction, type, detail) {
   at.textContent = (callStart ? (Date.now() - callStart) / 1000 : 0).toFixed(1) + 's'
   const arrow = document.createElement('span')
   arrow.className = 'dir'
-  arrow.textContent = direction === 'up' ? '↑' : '↓'
+  arrow.textContent = direction === 'up' ? 'â†‘' : 'â†“'
   const name = document.createElement('span')
   name.className = 'type'
   name.textContent = type
@@ -529,12 +506,11 @@ function eventRow(direction, type, detail) {
   return row
 }
 
-// Ten repaints a second, plus one when the run closes.
 function paint(live, final) {
   const now = performance.now()
   if (!final && now - live.painted < 100) return
   live.painted = now
-  live.row.querySelector('.count').textContent = live.count > 1 ? '×' + live.count : ''
+  live.row.querySelector('.count').textContent = live.count > 1 ? 'Ã—' + live.count : ''
   if (live.detail) live.row.querySelector('.detail').textContent = live.detail
 }
 
@@ -549,12 +525,10 @@ function logEvent(direction, type, detail) {
     paint(live)
     return
   }
-  // A real event closes the open runs, so the next burst starts a new row.
   if (!COALESCE.has(type)) {
     open.forEach((run) => paint(run, true))
     open.clear()
   }
-  // Only follow the tail if the reader is there.
   const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40
   const row = eventRow(direction, type, detail)
   log.append(row)
